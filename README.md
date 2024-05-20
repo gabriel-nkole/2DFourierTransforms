@@ -2,7 +2,7 @@
 by Gabriel Nkole
 
 ## Description
-Collection of different methods for calculating the forward and inverse fourier transforms of 2D images. This project uses the OpenCV library for reading and showing images and OpenMP for parallelism. 
+Collection of methods for calculating fourier transforms of 2D images. This project uses the OpenCV library for reading and displaying images and the OpenMP library for parallelism. 
 
 ## Screenshots
 ![noise](https://github.com/gabriel-nkole/2DFourierTransforms/assets/101514971/3dfd7a6f-1865-4e64-a841-f84293b00d64)
