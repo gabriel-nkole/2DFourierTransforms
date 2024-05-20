@@ -1,19 +1,7 @@
 .vs/
-fourier.h
-images/
 v2.sln
 v2.vcxproj
 v2.vcxproj.filters
 v2.vcxproj.user
-v2_opencv - Copy (10) Animation working, but needs optimizing.cpp
-v2_opencv - Copy (11) optimized just cleaning up.cpp
-v2_opencv - Copy (2) FFT POWERR.cpp
-v2_opencv - Copy (3).cpp
-v2_opencv - Copy (4) 4 channel.cpp
-v2_opencv - Copy (5) broken butterflyTexture stuff.cpp
-v2_opencv - Copy (6) DONE-ish.cpp
-v2_opencv - Copy (7).cpp
-v2_opencv - Copy (8).cpp
-v2_opencv - Copy (9).cpp
-v2_opencv - Copy.cpp
 x64/
+standard_test_images.zip
