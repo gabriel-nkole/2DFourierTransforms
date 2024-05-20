@@ -2,7 +2,7 @@
 by Gabriel Nkole
 
 ## Description
-FFT tings
+Collection of different methods for calculating the forward and inverse fourier transforms of 2D images. This project uses the OpenCV library for reading and showing images and OpenMP for parallelism. 
 
 ## Screenshots
 ![noise](https://github.com/gabriel-nkole/2DFourierTransforms/assets/101514971/3dfd7a6f-1865-4e64-a841-f84293b00d64)
@@ -12,4 +12,6 @@ FFT tings
 ![butterflyInverse](https://github.com/gabriel-nkole/2DFourierTransforms/assets/101514971/3dfd345c-d030-4016-839e-90220b6973a3)
 ![Height Map](https://github.com/gabriel-nkole/2DFourierTransforms/assets/101514971/aaae92e1-b244-4004-ba48-a2120f695bad)
 
-https://github.com/gabriel-nkole/2DFourierTransforms/assets/101514971/7d17e41f-a66a-44c8-b90a-236ade2d69ba
+https://github.com/gabriel-nkole/2DFourierTransforms/assets/101514971/09baccc1-d2d6-49ab-bb11-3d7329ec092d
+
+
