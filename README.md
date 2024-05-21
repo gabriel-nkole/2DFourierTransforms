@@ -2,7 +2,7 @@
 by Gabriel Nkole
 
 ## Description
-Collection of methods for calculating fourier transforms of 2D images. This project uses the OpenCV library for reading and displaying images and the OpenMP library for parallelism. 
+Collection of methods for calculating fourier transforms of 2D images. This project uses the OpenCV library for reading and displaying images and the OpenMP library for parallelism.
 
 ## Screenshots/Video
 ![noise](https://github.com/gabriel-nkole/2DFourierTransforms/assets/101514971/3dfd7a6f-1865-4e64-a841-f84293b00d64)
@@ -18,4 +18,4 @@ https://github.com/gabriel-nkole/2DFourierTransforms/assets/101514971/09baccc1-d
 
 ## References
 - How the Discrete Fourier Transform (DFT) works, with code in C++ - https://www.youtube.com/watch?v=ITnPS8HGqLo
-- The Fourier Transform and its Applications (pp. 289-291) - https://see.stanford.edu/materials/lsoftaee261/book-fall-07.pdf 
+- The Fourier Transform and its Applications (pp. 289-291) - https://see.stanford.edu/materials/lsoftaee261/book-fall-07.pdf
