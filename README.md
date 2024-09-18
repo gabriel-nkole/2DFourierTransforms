@@ -14,7 +14,9 @@ Collection of methods for calculating fourier transforms of 2D images. This proj
 ![hk](https://github.com/gabriel-nkole/2DFourierTransforms/assets/101514971/8df92e34-fa9f-43f1-8a2e-cebe10b227a8)
 ![Height Map](https://github.com/gabriel-nkole/2DFourierTransforms/assets/101514971/aaae92e1-b244-4004-ba48-a2120f695bad)
 
-https://github.com/gabriel-nkole/2DFourierTransforms/assets/101514971/09baccc1-d2d6-49ab-bb11-3d7329ec092d
+https://github.com/user-attachments/assets/22c8e8ad-d97c-440c-b165-0238aad41f79
+
+https://github.com/user-attachments/assets/fb799be9-3b0f-4ae4-b154-209d82087be2
 
 ## References
 - How the Discrete Fourier Transform (DFT) works, with code in C++ - https://www.youtube.com/watch?v=ITnPS8HGqLo
