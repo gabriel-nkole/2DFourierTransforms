@@ -47,7 +47,7 @@ void fft2D_(Mat* pSignal, Mat* pX, bool forward, bool spectrum);
 void horizontalButterfly_(int n, int row, Mat* pPingpong0, Mat* pPingpong1, bool forward);
 void verticalButterfly_(int n, int col, Mat* pPingpong0, Mat* pPingpong1, bool forward);
 
-// 2D fourier transform broken down to a series of 1D FTs on the rows followed by 1D FTs on the resultant columns (slow) -- O(n^2)
+// 2D fourier transform broken down into a series of 1D FTs on the rows followed by 1D FTs on the resultant columns (slow) -- O(n^2)
 void ft2D(Mat* pSignal, Mat* pX, bool forward, bool spectrum);
 void ft1D(Mat* pSignal, Mat* pX, bool forward, bool horizontal, int row_col);
 
@@ -410,6 +410,8 @@ static void createButterflyTexture(Mat* pButterfly, bool forward) {
 
 
 
+// Discrete Fourier Transforms
+
 // optimised 2D fast fourier transform that uses a texture of pre-computed twiddle factors and input indices
 // ! - Input signal will be altered, will become unusable after running the FFT
 void fft2D(Mat* pSignal, Mat* pX, bool forward, bool spectrum) {
@@ -666,7 +668,7 @@ void verticalButterfly_(int n, int col, Mat* pPingpong0, Mat* pPingpong1, bool f
 }
 
 
-// 2D fourier transform broken down to a series of 1D FTs on the rows followed by 1D FTs on the resultant columns
+// 2D fourier transform broken down into a series of 1D FTs on the rows followed by 1D FTs on the resultant columns
 void ft2D(Mat* pSignal, Mat* pX, bool forward, bool spectrum) {
     // Row FTs
     #pragma omp parallel for
@@ -881,7 +883,7 @@ void createNoiseTexture(Mat* pNoise) {
 
 
 
-// Load image from disk
+// Load Image From Disk
 void loadImage(Mat* pImg, string image_path) {
     *pImg = imread(image_path, IMREAD_GRAYSCALE);
     pImg->convertTo(*pImg, CV_32FC1);
@@ -891,8 +893,9 @@ void loadImage(Mat* pImg, string image_path) {
 
 
 
-// Convert/display images
-// convert between grayscale and BGRA
+// Convert/Display Images
+
+// grayscale to BGRA
 void im1CTo4C(Mat* pImage1C, Mat* pImage4C) {
     for (int y = 0; y < M; y++) {
         for (int x = 0; x < M; x++) {
@@ -906,6 +909,7 @@ void im1CTo4C(Mat* pImage1C, Mat* pImage4C) {
     }
 }
 
+// BGRA to grayscale
 void im4CTo1C(Mat* pImage4C, Mat* pImage1C) {
     for (int y = 0; y < M; y++) {
         for (int x = 0; x < M; x++) {
@@ -916,8 +920,6 @@ void im4CTo1C(Mat* pImage4C, Mat* pImage1C) {
     }
 }
 
-
-// convert and display
 void imshow1CTo4C(string name, Mat* pImage1C, Mat* pImage4C) {
     im1CTo4C(pImage1C, pImage4C);
     imshow(name, *pImage4C);
