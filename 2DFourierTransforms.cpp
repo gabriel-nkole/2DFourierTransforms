@@ -1,6 +1,6 @@
-#define _USE_MATH_DEFINES
+#define M_PI 3.14159f
 
-// Includes
+// INCLUDES
 #include <iostream>
 #include <math.h>
 #include <complex>
@@ -15,32 +15,39 @@
 using Clock = std::chrono::high_resolution_clock;
 
 
-// Namespaces
+// NAMESPACES
 using namespace cv;
 using namespace std;
 
 
-// Functions
-// 
-// general
+// FUNCTIONS
+// General
+
+void complex_add(float n1_r, float n1_i, float n2_r, float n2_i, float* pResult);
+void complex_mul(float n1_r, float n1_i, float n2_r, float n2_i, float* pResult);
 void normalise(Mat* pData, bool forward, bool spectrum);
 void shiftSpectrum(Mat* pX, Mat* pXShift);
 unsigned int reverseBits(unsigned int num, int numBits);
 static void createButterflyTexture(Mat* pButterfly, bool forward);
 
 
+
+// Discrete Fourier Transforms
+
 // optimised 2D fast fourier transform that uses a texture of pre-computed twiddle factors and input indices (fast) -- O(nlog(n))
+// ! - Input signal will be altered, will become unusable after running the FFT
 void fft2D(Mat* pSignal, Mat* pX, bool forward, bool spectrum);
 void fft2DWrapped(Mat* pSignal, Mat* pX, bool forward, bool spectrum, Mat* pButterfly);
 void horizontalButterfly(int stage, int y, int x, Mat* pPingpongIn, Mat* pPingpongOut, Mat* pButterfly);
 void verticalButterfly(int stage, int y, int x, Mat* pPingpongIn, Mat* pPingpongOut, Mat* pButterfly);
 
-// My 2D fast fourier transform implementation that involved converting the recursive definition into an interative one (fast) -- O(nlog(n))
+// my 2D fast fourier transform implementation that involved converting the recursive definition into an interative algorithm (fast) -- O(nlog(n))
+// ! - Input signal will be altered, will become unusable after running the FFT
 void fft2D_(Mat* pSignal, Mat* pX, bool forward, bool spectrum);
 void horizontalButterfly_(int n, int row, Mat* pPingpong0, Mat* pPingpong1, bool forward);
 void verticalButterfly_(int n, int col, Mat* pPingpong0, Mat* pPingpong1, bool forward);
 
-// 2D fourier transform broken down as a series of 1D FTs on the rows followed by 1D FTs on the resultant columns (slow) -- O(n^2)
+// 2D fourier transform broken down to a series of 1D FTs on the rows followed by 1D FTs on the resultant columns (slow) -- O(n^2)
 void ft2D(Mat* pSignal, Mat* pX, bool forward, bool spectrum);
 void ft1D(Mat* pSignal, Mat* pX, bool forward, bool horizontal, int row_col);
 
@@ -48,16 +55,24 @@ void ft1D(Mat* pSignal, Mat* pX, bool forward, bool horizontal, int row_col);
 void ft2D_(Mat* pSignal, Mat* pX, bool forward, bool spectrum);
 
 
-// create oceanographic spectra
-void createHk(Mat* pH0k, Mat* pH0minusk, Mat* pHk, double t);
+
+// Oceanographic Spectra
+
+// rotate spectrum across the complex plane to move simulation through time
+void createHk(Mat* pH0k, Mat* pH0minusk, Mat* pHk, float t);
 void createH0(Mat* pNoise, Mat* pH0k, Mat* pH0minusk);
-double phillips(double K1, double K2, double k);
+float phillips(float K1, float K2, float k);
 void createNoiseTexture(Mat* pNoise);
 
-// load image from disk
-Mat loadImage(string image_path);
 
-// convert/display images
+
+// Load Image From Disk
+void loadImage(Mat* pImg, string image_path);
+
+
+
+// Convert/Display Images
+
 void im1CTo4C(Mat* pImage1C, Mat* pImage4C);
 void im4CTo1C(Mat* pImage4C, Mat* pImage1C);
 void imshow1CTo4C(string name, Mat* pImage1C, Mat* pImage4C);
@@ -76,24 +91,28 @@ const bool NORMAL_IMG = 0;
 
 
 // Phillips Spectrum Constants
-const double L = 1000;
-const double V = 40;
-const double g = 9.80665;
-const double L_ = V*V/g;
+const float L = 1000.0f; //length scale (m)
+const float V = 40.0f; //wind speed
+const float g = 9.80665f; //gravity
+const float L_ = V*V/g;
 
-const double W1 = 1;
-const double W2 = 1;
-const double w = sqrt(W1*W1 + W2*W2);
+// wind direction
+const float W1 = 1.0f;
+const float W2 = 1.0f;
+const float w = sqrtf(W1*W1 + W2*W2); //used to normalize wind vector if (W1, W2) is not a unit-vector
 
-const double A = 4;
-const double l = 0.5;
+const float A = 4.0f; //wave amplitude
+const float l = 0.5f; //small wave suppression coefficient
+const float directionExp = 2.0f; //exponent for supressing waves perpendicular to wind
+
 
 // Simulation Speed
-const double SimulationSpeed = 1.0;
+const float SimulationSpeed = 10.0f;
+
 
 // Texture Constants
-#define M 256   // texture size (should be a power of 2 when using the FFTs)
-constexpr int cx_log2(int n) { 
+#define M 256   // texture size (needs to be a power of 2 when using the FFTs)
+constexpr int cx_log2(float n) { 
     if (n <= 2) {
         return 1;
     }
@@ -101,15 +120,15 @@ constexpr int cx_log2(int n) {
         return cx_log2(n/2)+1;
     }
 }
-#define BitsConst cx_log2(M)
+#define NumBits cx_log2(M)
 
 
 // Global Fourier Transform Variables
-Mat Pingpong(M, M, CV_64FC4);
-Mat ButterflyForward(M, BitsConst, CV_64FC4);
-Mat ButterflyInverse(M, BitsConst, CV_64FC4);
+Mat Pingpong(M, M, CV_32FC4);       // stores intermediate results of ft calculations
+Mat ButterflyForward(M, NumBits, CV_32FC4);
+Mat ButterflyInverse(M, NumBits, CV_32FC4);
 
-//pre-compute butterfly textures
+// Pre-compute butterfly textures
 void InitButterflyTextures() {
     createButterflyTexture(&ButterflyForward, true);
     createButterflyTexture(&ButterflyInverse, false);
@@ -118,97 +137,122 @@ void InitButterflyTextures() {
 
 int main(){
     InitButterflyTextures();
-    // display butterfly texture
-    //Mat butterflyCopy(M, BitsConst, CV_64FC4);
-    //memcpy(butterflyCopy.data, ButterflyInverse.data, M*BitsConst*4 * sizeof(double));
-    //resize(butterflyCopy, butterflyCopy, { M, M }, 0, 0, cv::INTER_NEAREST);
-    //imshow("butterflyInverse", butterflyCopy);
+    // display inverse butterfly texture
+    //Mat butterflyInverse_(M, NumBits, CV_32FC4);
+    //memcpy(butterflyInverse_.data, ButterflyInverse.data, M*NumBits*4 * sizeof(float));
+    //resize(butterflyInverse_, butterflyInverse_, { M, M }, 0, 0, cv::INTER_NEAREST);
+    //imshow("butterflyInverse", butterflyInverse_);
 
 
 
     
-    //Spectrum Image
-    // noise image
-    Mat noise(M, M, CV_64FC4);
+    // SPECTRUM IMAGE
+    // noise texture
+    Mat noise(M, M, CV_32FC4);
     createNoiseTexture(&noise);
     //imshow("noise", noise);
     
     // spectrum texture init
-    Mat h0k(M, M, CV_64FC4);
-    Mat h0minusk(M, M, CV_64FC4);
+    Mat h0k(M, M, CV_32FC4);
+    Mat h0minusk(M, M, CV_32FC4);
     createH0(&noise, &h0k, &h0minusk);
     //imshow("h0k", h0k);
     //imshow("h0minusk", h0minusk);
     
     
     // spectrum texture(t)
-    Mat hk(M, M, CV_64FC4);
-    Mat heightmap4C(M, M, CV_64FC4);
-    Mat heightmap1C(M, M, CV_64FC1);
+    Mat hk(M, M, CV_32FC4);
+    Mat heightmap4C(M, M, CV_32FC4);
+    Mat heightmap1C(M, M, CV_32FC1);
     
+
+    // time
     chrono::steady_clock::time_point start = Clock::now();
     chrono::steady_clock::time_point current;
-    double t = 0;
+    float elapsedSimulationTime = 0;
+
+    chrono::steady_clock::time_point frameStart = Clock::now();
+    float frameTime = 0;
     
+
+    // render loop
     while (true) {
         // hk
-        createHk(&h0k, &h0minusk, &hk, t);
+        createHk(&h0k, &h0minusk, &hk, elapsedSimulationTime);
         //imshow("hk", hk);
     
-        // height texture (IFT)
-        fft2D(&hk, &heightmap4C, INVERSE, SPECTRUM_IMG);
+        // IFT(hk) = height map
+        fft2D(&hk, &heightmap4C, INVERSE, SPECTRUM_IMG);  // can cycle between fft2D, fft2D_, ft2D, ft2D_
         //imshow("Height Map", heightmap4C);
         imshow4CTo1C("Height Map", &heightmap4C, &heightmap1C);
         //imshow4CTo1CNew("Height Map", &heightmap4C);
     
+
+        // FT(IFT(hk)) = hk
+        //Mat hk_shifted(M, M, CV_32FC4);
+        //Mat hk_(M, M, CV_32FC4);
+        //fft2D(&heightmap4C, &hk_shifted, FORWARD, SPECTRUM_IMG);
+        //shiftSpectrum(&hk_shifted, &hk_);
+        //imshow("hk_", hk_);
+
     
-        // refresh window
+        // refresh window(s)
         int key = waitKey(1);
         if (key == 'q') {
             break;
         }
     
         // advance time
-        current = Clock::now();                                                    //to seconds
-        t = (chrono::duration_cast<chrono::nanoseconds>(current - start).count() * 0.000000001) * SimulationSpeed;
-        cout << t << "s" << endl;
+        current = Clock::now();                                                                        //to seconds
+        elapsedSimulationTime = (chrono::duration_cast<chrono::nanoseconds>(current - start).count() * 0.000000001f) * SimulationSpeed;
+
+        // calculate frame-time                                                                //to milliseconds
+        frameTime = chrono::duration_cast<chrono::nanoseconds>(current - frameStart).count() * 0.000001f;
+        frameStart = current;
+        cout << frameTime << "ms" << endl;
     }
     
     
 
     /*
-    // load Image
-    Mat img = loadImage("./images/lena_color_256.tif");
+    // NORMAL IMAGE
+    // load image
+    Mat img;
+    loadImage(&img, "./images/lena_gray_256.tif");
     //imshow("Image", img);
     
     // 1Channel -> 4Channel
-    Mat signal(M, M, CV_64FC4);
+    Mat signal(M, M, CV_32FC4);
     im1CTo4C(&img, &signal);
-    //imshow("signal4C", signal);
+    //imshow("signal", signal);
     
     
-    // FT
-    Mat X(M, M, CV_64FC4);
+    // FT(signal)
+    Mat X(M, M, CV_32FC4);
     fft2D(&signal, &X, FORWARD, NORMAL_IMG);
     //X *= 255;
     //imshow("X", X);
+
+    //imshow("signal after FFT", signal);   // confirming that ffts alter original signal
     
     // Shift
-    Mat X_shift(M, M, CV_64FC4);
-    shiftSpectrum(&X, &X_shift);
-    X_shift *= 255;
-    imshow("X Shift", X_shift);
+    Mat X_shifted(M, M, CV_32FC4);
+    shiftSpectrum(&X, &X_shifted);
+    X_shifted *= 255;
+    imshow("X Shift", X_shifted);
     
     
-    // IFT
-    //X /= 255;
-    Mat x(M, M, CV_64FC4);
-    fft2D(&X, &x, INVERSE, NORMAL_IMG);
-    imshow4CTo1CNew("x", &x);
+    //// IFT(FT(signal)) = signal
+    ////X /= 255;
+    //Mat x(M, M, CV_32FC4);
+    //fft2D(&X, &x, INVERSE, NORMAL_IMG);
+    //imshow4CTo1CNew("x", &x);
+
+
+    // keep window(s) open
+    waitKey(0);
     */
 
-    // refresh window
-    waitKey(0);
 
     return 0;
 }
@@ -216,14 +260,27 @@ int main(){
 
 
 // General
-// normalises output signal by essentially dividing it by the size of the signal
+
+// add two complex numbers
+void complex_add(float n1_r, float n1_i, float n2_r, float n2_i, float* pResult) {
+    pResult[0] = n1_r + n2_r;
+    pResult[1] = n1_i + n2_i;
+}
+
+// multiply two complex numbers
+void complex_mul(float n1_r, float n1_i, float n2_r, float n2_i, float* pResult) {
+    pResult[0] = n1_r * n2_r - n1_i * n2_i;
+    pResult[1] = n1_r * n2_i + n1_i * n2_r;
+}
+
+// divides output signal by its size
 void normalise(Mat* pData, bool forward, bool spectrum) {
     if (spectrum) {
         if (forward) {
             #pragma omp parallel for collapse(2)
             for (int y = 0; y < M; y++) {
                 for (int x = 0; x < M; x++) {
-                    double* pixel = pData->ptr<double>(y, x);
+                    float* pixel = pData->ptr<float>(y, x);
 
                     pixel[0] = 0;
                     pixel[3] = 1;
@@ -234,11 +291,11 @@ void normalise(Mat* pData, bool forward, bool spectrum) {
             #pragma omp parallel for collapse(2)
             for (int y = 0; y < M; y++) {
                 for (int x = 0; x < M; x++) {
-                    double perm = 1.0;
-                    int idx = int(fmod(int(y + x), 2));
-                    perm = idx ? 1.0 : -1.0;
+                    float perm = 1.0;
+                    int idx = int(fmodf((float)(y + x), 2.0f));
+                    perm = idx ? 1.0f : -1.0f;
 
-                    double* pixel = pData->ptr<double>(y, x);
+                    float* pixel = pData->ptr<float>(y, x);
                     pixel[2] = (pixel[2]/(M*M))*perm;
                     pixel[1] = 0;
                     pixel[0] = 0;
@@ -253,7 +310,7 @@ void normalise(Mat* pData, bool forward, bool spectrum) {
             #pragma omp parallel for collapse(2)
             for (int y = 0; y < M; y++) {
                 for (int x = 0; x < M; x++) {
-                    double* pixel = pData->ptr<double>(y, x);
+                    float* pixel = pData->ptr<float>(y, x);
 
                     pixel[2] = pixel[2]/(M*M);
                     pixel[1] = pixel[1]/(M*M);
@@ -266,8 +323,9 @@ void normalise(Mat* pData, bool forward, bool spectrum) {
             #pragma omp parallel for collapse(2)
             for (int y = 0; y < M; y++) {
                 for (int x = 0; x < M; x++) {
-                    double* pixel = pData->ptr<double>(y, x);
+                    float* pixel = pData->ptr<float>(y, x);
 
+                    pixel[1] = 0;
                     pixel[0] = 0;
                     pixel[3] = 1;
                 }
@@ -276,14 +334,14 @@ void normalise(Mat* pData, bool forward, bool spectrum) {
     }
 }
 
-// shifts spectrum from image corners to center and vice-versa
+// shifts spectrum from image corners to center and vice-versa by swapping quadrants
 void shiftSpectrum(Mat* pX, Mat* pXShift) {
     for (int v = 0; v < M/2; v++) {
-        memcpy(pXShift->ptr<double>(v + M/2, M/2), pX->ptr<double>(v), M*2 * sizeof(double));
-        memcpy(pXShift->ptr<double>(v), pX->ptr<double>(v + M/2, M/2), M*2 * sizeof(double));
+        memcpy(pXShift->ptr<float>(v + M/2, M/2), pX->ptr<float>(v), M*2 * sizeof(float));   //top-left -> bottom-right
+        memcpy(pXShift->ptr<float>(v), pX->ptr<float>(v + M/2, M/2), M*2 * sizeof(float));   //bottom-right -> top-left
 
-        memcpy(pXShift->ptr<double>(v + M/2, 0), pX->ptr<double>(v, M/2), M*2 * sizeof(double));
-        memcpy(pXShift->ptr<double>(v, M/2), pX->ptr<double>(v + M/2, 0), M*2 * sizeof(double));
+        memcpy(pXShift->ptr<float>(v + M/2), pX->ptr<float>(v, M/2), M*2 * sizeof(float));   //top-right -> bottom-left
+        memcpy(pXShift->ptr<float>(v, M/2), pX->ptr<float>(v + M/2), M*2 * sizeof(float));   //bottom-left-> top-right
     }
 }
 
@@ -297,52 +355,53 @@ unsigned int reverseBits(unsigned int num, int numBits) {
     return rev;
 }
 
+// pre-computes twiddle factors and input indices for all FFT stages and stores them in a texture
 static void createButterflyTexture(Mat* pButterfly, bool forward) {
     #pragma omp parallel for collapse(2)
     for (int m = 0; m < M; m++) {
-        for (int stage = 0; stage < BitsConst; stage++) {
-            double k = fmod(double(m) * (double(M)/pow(2, stage + 1)), M);
-            double exp = 2.0 * M_PI * k / double(M) * (forward ? -1 : 1);
-            complex<double> twiddle(cos(exp), sin(exp));
+        for (int stage = 0; stage < NumBits; stage++) {
+            float k = fmodf((float)m * ((float)M/powf(2, stage + 1.0f)), M);
+            float expo = 2.0f * M_PI * k / (float)M * (forward ? -1.0f : 1.0f);
+            float cosExpo = cosf(expo);
+            float sinExpo = sinf(expo);
 
-            int butterflyspan = int(pow(2, stage));
+            int butterflyspan = int(powf(2.0f, (float)stage));
 
             int butterflywing;
-            if(fmod(m, pow(2, stage + 1)) < pow(2, stage))
+            if(fmodf((float)m, powf(2.0f, (float)stage + 1.0f)) < powf(2.0f, (float)stage))
                 butterflywing = 1;
             else butterflywing = 0;
 
 
-            double* pixel = pButterfly->ptr<double>(m, stage);
+            float* pixel = pButterfly->ptr<float>(m, stage);
             if (stage == 0) {
-                if (butterflywing == 1){
-                             //M-1 - y
-                    pixel[2] = twiddle.real();//r
-                    pixel[1] = twiddle.imag();//g
-                    pixel[0] = reverseBits(m, BitsConst);//b
-                    pixel[3] = reverseBits(m + 1, BitsConst);//a
+                if (butterflywing == 1) {
+                    pixel[2] = cosExpo; //r
+                    pixel[1] = sinExpo; //g
+                    pixel[0] = (float) reverseBits(m, NumBits); //b
+                    pixel[3] = (float) reverseBits(m + 1, NumBits); //a
                 }
 
-                else{
-                    pixel[2] = twiddle.real();//r
-                    pixel[1] = twiddle.imag();//g
-                    pixel[0] = reverseBits(m - 1, BitsConst);//b
-                    pixel[3] = reverseBits(m, BitsConst);//a
+                else {
+                    pixel[2] = cosExpo; //r
+                    pixel[1] = sinExpo; //g
+                    pixel[0] = (float) reverseBits(m - 1, NumBits); //b
+                    pixel[3] = (float) reverseBits(m, NumBits); //a
                 }
             }
             else {
-                if (butterflywing == 1){
-                    pixel[2] = twiddle.real();//r
-                    pixel[1] = twiddle.imag();//g
-                    pixel[0] = m;//b
-                    pixel[3] = m + butterflyspan;//a
+                if (butterflywing == 1) {
+                    pixel[2] = cosExpo; //r
+                    pixel[1] = sinExpo; //g
+                    pixel[0] = (float) m; //b
+                    pixel[3] = (float) m + butterflyspan; //a
                 }
 
-                else{
-                    pixel[2] = twiddle.real();//r
-                    pixel[1] = twiddle.imag();//g
-                    pixel[0] = m - butterflyspan;//b
-                    pixel[3] = m;//a
+                else {
+                    pixel[2] = cosExpo; //r
+                    pixel[1] = sinExpo; //g
+                    pixel[0] = (float) m - butterflyspan; //b
+                    pixel[3] = (float) m; //a
                 }
             }
         }
@@ -352,6 +411,7 @@ static void createButterflyTexture(Mat* pButterfly, bool forward) {
 
 
 // optimised 2D fast fourier transform that uses a texture of pre-computed twiddle factors and input indices
+// ! - Input signal will be altered, will become unusable after running the FFT
 void fft2D(Mat* pSignal, Mat* pX, bool forward, bool spectrum) {
     if (forward) {
         fft2DWrapped(pSignal, pX, forward, spectrum, &ButterflyForward);
@@ -361,24 +421,23 @@ void fft2D(Mat* pSignal, Mat* pX, bool forward, bool spectrum) {
     }
 }
 
-//N.B. signal will be changed, should not be used again after running the FFT
 void fft2DWrapped(Mat* pSignal, Mat* pX, bool forward, bool spectrum, Mat* pButterfly) {
     bool pingpong = 0;
     
-    //horizontal butterflies
-    for (int stage = 0; stage < BitsConst; stage++){
+    // horizontal butterflies
+    for (int stage = 0; stage < NumBits; stage++) {
         if (pingpong == 0) {
             #pragma omp parallel for collapse(2)
-            for (int y = 0; y < M; y++){
-                for (int x = 0; x < M; x++){
+            for (int y = 0; y < M; y++) {
+                for (int x = 0; x < M; x++) {
                     horizontalButterfly(stage, y, x, pSignal, &Pingpong, pButterfly);
                 }
             }
         }
         else if (pingpong == 1) {
             #pragma omp parallel for collapse(2)
-            for (int y = 0; y < M; y++){
-                for (int x = 0; x < M; x++){
+            for (int y = 0; y < M; y++) {
+                for (int x = 0; x < M; x++) {
                     horizontalButterfly(stage, y, x, &Pingpong, pSignal, pButterfly);
                 }
             }
@@ -387,20 +446,20 @@ void fft2DWrapped(Mat* pSignal, Mat* pX, bool forward, bool spectrum, Mat* pButt
         pingpong = !pingpong;
     }
 
-    //vertical butterflies
-    for (int stage = 0; stage < BitsConst; stage++){
+    // vertical butterflies
+    for (int stage = 0; stage < NumBits; stage++) {
         if (pingpong == 0) {
             #pragma omp parallel for collapse(2)
-            for (int y = 0; y < M; y++){
-                for (int x = 0; x < M; x++){
+            for (int y = 0; y < M; y++) {
+                for (int x = 0; x < M; x++) {
                     verticalButterfly(stage, y, x, pSignal, &Pingpong, pButterfly);
                 }
             }
         }
         else if (pingpong == 1) {
             #pragma omp parallel for collapse(2)
-            for (int y = 0; y < M; y++){
-                for (int x = 0; x < M; x++){
+            for (int y = 0; y < M; y++) {
+                for (int x = 0; x < M; x++) {
                     verticalButterfly(stage, y, x, &Pingpong, pSignal, pButterfly);
                 }
             }
@@ -410,79 +469,64 @@ void fft2DWrapped(Mat* pSignal, Mat* pX, bool forward, bool spectrum, Mat* pButt
     }
 
 
-    //copy
+    // copy data to output image
     if (pingpong == 0) {
-        memcpy(pX->data, pSignal->data, M*M*4 * sizeof(double));
+        memcpy(pX->data, pSignal->data, M*M*4 * sizeof(float));
     }
     else {
-        memcpy(pX->data, Pingpong.data, M*M*4 * sizeof(double));
+        memcpy(pX->data, Pingpong.data, M*M*4 * sizeof(float));
     }
 
 
-    //Normalisation
+    // normalise
     normalise(pX, forward, spectrum);
 }
 
 void horizontalButterfly(int stage, int y, int x, Mat* pPingpongIn, Mat* pPingpongOut, Mat* pButterfly) {
-    double data[4];
-    memcpy(&data, pButterfly->ptr<double>(x, stage), 4*sizeof(double));
-
-    double p_[2];              
-    int pIdx = (int)data[0]; //blue
-    double* pixelInP = pPingpongIn->ptr<double>(y, pIdx);
-    p_[0] = pixelInP[2]; //red
-    p_[1] = pixelInP[1]; //green
-
-    double q_[2];              
-    int qIdx = (int)data[3]; //alpha
-    double* pixelInQ = pPingpongIn->ptr<double>(y, qIdx);
-    q_[0] = pixelInQ[2]; //red 
-    q_[1] = pixelInQ[1]; //green
+    float data[4];
+    memcpy(&data, pButterfly->ptr<float>(x, stage), 4*sizeof(float));
+                                           //butterfly - blue             
+    float* p_ = pPingpongIn->ptr<float>(y, (int)data[0]);
+                                           //butterfly - alpha 
+    float* q_ = pPingpongIn->ptr<float>(y, (int)data[3]);
 
 
-    complex<double> p(p_[0], p_[1]);
-    complex<double> q(q_[0], q_[1]);
-    complex<double> w(data[2], data[1]);
+    float H[2];
+    //butterfly - red    - green
+    complex_mul(data[2], data[1], q_[2], q_[1], H);
+    complex_add(H[0], H[1], p_[2], p_[1], H);
 
-    complex<double> H = w*q + p;
 
-    double* pixelOut = pPingpongOut->ptr<double>(y, x);
-    pixelOut[2] = H.real();
-    pixelOut[1] = H.imag();
+    float* pixelPOut = pPingpongOut->ptr<float>(y, x);
+    pixelPOut[2] = H[0]; //output - red
+    pixelPOut[1] = H[1]; //output - green
 }
 
 void verticalButterfly(int stage, int y, int x, Mat* pPingpongIn, Mat* pPingpongOut, Mat* pButterfly) {
-    double data[4];
-    memcpy(&data, pButterfly->ptr<double>(y, stage), 4*sizeof(double));
-
-    double p_[2];  
-    int pIdx = (int)data[0]; //blue
-    double* pixelInP = pPingpongIn->ptr<double>(pIdx, x);
-    p_[0] = pixelInP[2]; //red
-    p_[1] = pixelInP[1]; //green
-
-    double q_[2];
-    int qIdx = (int)data[3]; //alpha
-    double* pixelInQ = pPingpongIn->ptr<double>(qIdx, x);
-    q_[0] = pixelInQ[2]; //red 
-    q_[1] = pixelInQ[1]; //green
+    float data[4];
+    memcpy(&data, pButterfly->ptr<float>(y, stage), 4*sizeof(float));
+                                        //butterfly - blue  
+    float* p_ = pPingpongIn->ptr<float>((int)data[0], x);
+                                        //butterfly - alpha
+    float* q_ = pPingpongIn->ptr<float>((int)data[3], x);
 
 
-    complex<double> p(p_[0], p_[1]);
-    complex<double> q(q_[0], q_[1]);
-    complex<double> w(data[2], data[1]);
+    float H[2];
+    //butterfly - red    - green
+    complex_mul(data[2], data[1], q_[2], q_[1], H);
+    complex_add(H[0], H[1], p_[2], p_[1], H);
 
-    complex<double> H = w*q + p;
 
-    double* pixelOut = pPingpongOut->ptr<double>(y, x);
-    pixelOut[2] = H.real();
-    pixelOut[1] = H.imag();
+    float* pixelPOut = pPingpongOut->ptr<float>(y, x);
+    pixelPOut[2] = H[0]; //output - red
+    pixelPOut[1] = H[1]; //output - green
 }
 
 
-// My 2D fast fourier transform implementation that involved converting the recursive definition into an interative one
+// my 2D fast fourier transform implementation that involved converting the recursive definition into an interative algorithm
+// ! - Input signal will be altered, will become unusable after running the FFT
 void fft2D_(Mat* pSignal, Mat* pX, bool forward, bool spectrum) {
-    //horizontal butterflies
+    // horizontal butterflies
     for (int n = 2; n <= M; n*=2) {
         #pragma omp parallel for
         for (int y = 0; y < M; y++) {
@@ -490,7 +534,7 @@ void fft2D_(Mat* pSignal, Mat* pX, bool forward, bool spectrum) {
         }
     }
 
-    //vertical butterflies
+    // vertical butterflies
     for (int n = 2; n <= M; n *= 2) {
         #pragma omp parallel for
         for (int x = 0; x < M; x++) {
@@ -499,52 +543,64 @@ void fft2D_(Mat* pSignal, Mat* pX, bool forward, bool spectrum) {
     }
 
 
-
-    //Normalization
+    // normalise
     normalise(pX, forward, spectrum);
 }
 
 void horizontalButterfly_(int n, int row, Mat* pPingpong0, Mat* pPingpong1, bool forward) {
     #pragma omp parallel for
-    for (int v = 0; v < M; v+=n){
+    for (int v = 0; v < M; v+=n) {
 
-        double exp = 2 * M_PI / n * (forward ? -1 : 1);
-        complex<double> w(1), wn(cos(exp), sin(exp));
+        float expo = 2.0f * M_PI / n * (forward ? -1.0f : 1.0f);
+        float cosExpo = cosf(expo);
+        float sinExpo = sinf(expo);
 
-        #pragma omp parallel for
+        float w[2];
+        w[0] = 1.0f;
+        w[1] = 0.0f;
+
+
         for (int i = 0; i < n/2; i++) {
             int evenIdx = v+  2*i;
             int oddIdx =  v+  2*i + 1;
             if (n==2) {
-                evenIdx = reverseBits(evenIdx, BitsConst);
-                oddIdx = reverseBits(oddIdx, BitsConst);
+                evenIdx = reverseBits(evenIdx, NumBits);
+                oddIdx = reverseBits(oddIdx, NumBits);
             }
 
 
-            double* pixelP0Even = pPingpong0->ptr<double>(row, evenIdx);
-            double* pixelP0Odd = pPingpong0->ptr<double>(row, oddIdx);
-            complex<double> even(pixelP0Even[2], pixelP0Even[1]);
-            complex<double> odd(pixelP0Odd[2], pixelP0Odd[1]);
+            float* pixelP0Odd = pPingpong0->ptr<float>(row, oddIdx);
+            float* pixelP0Even = pPingpong0->ptr<float>(row, evenIdx);
 
-            complex<double> butterfly_1 = even + w * odd;
-            complex<double> butterfly_2 = even - w * odd;
-            
+            // w*odd + even;
+            float butterfly_1[2];
+            complex_mul(w[0], w[1], pixelP0Odd[2], pixelP0Odd[1], butterfly_1);
+            complex_add(butterfly_1[0], butterfly_1[1], pixelP0Even[2], pixelP0Even[1], butterfly_1);
 
-            double* pixelP1First =  pPingpong1->ptr<double>(row, v+  i);
-            double* pixelP1Second = pPingpong1->ptr<double>(row, v+  i + n/2);
-            pixelP1First[2] = butterfly_1.real();   pixelP1First[1] = butterfly_1.imag();
-            pixelP1Second[2] = butterfly_2.real();  pixelP1Second[1] = butterfly_2.imag();
-            w *= wn;
+            // -w*odd + even;
+            float butterfly_2[2];
+            complex_mul(-w[0], -w[1], pixelP0Odd[2], pixelP0Odd[1], butterfly_2);
+            complex_add(butterfly_2[0], butterfly_2[1], pixelP0Even[2], pixelP0Even[1], butterfly_2);
+
+
+            float* pixelP1First =  pPingpong1->ptr<float>(row, v+  i);
+            float* pixelP1Second = pPingpong1->ptr<float>(row, v+  i + n/2);
+            pixelP1First[2] = butterfly_1[0];   pixelP1First[1] = butterfly_1[1];
+            pixelP1Second[2] = butterfly_2[0];  pixelP1Second[1] = butterfly_2[1];
+
+
+            // w *= wn;
+            complex_mul(w[0], w[1], cosExpo, sinExpo, w);
         }
     }
 
-    //even-odd merge step
-    if (n < M){
+    // even-odd merge step
+    if (n < M) {
         #pragma omp parallel for collapse(2)
-        for (int v = 0; v < M; v+=2*n){
-            for(int i = 0; i < 2*n; i+=2){
-                memcpy(pPingpong0->ptr<double>(row, v + i),   pPingpong1->ptr<double>(row, v + i/2),     4*sizeof(double));
-                memcpy(pPingpong0->ptr<double>(row, v + i+1), pPingpong1->ptr<double>(row, v + i/2 + n), 4*sizeof(double));
+        for (int v = 0; v < M; v+=2*n) {
+            for (int i = 0; i < 2*n; i+=2) {
+                memcpy(pPingpong0->ptr<float>(row, v + i),   pPingpong1->ptr<float>(row, v + i/2),     4*sizeof(float));
+                memcpy(pPingpong0->ptr<float>(row, v + i+1), pPingpong1->ptr<float>(row, v + i/2 + n), 4*sizeof(float));
             }
         }
     }
@@ -552,92 +608,108 @@ void horizontalButterfly_(int n, int row, Mat* pPingpong0, Mat* pPingpong1, bool
 
 void verticalButterfly_(int n, int col, Mat* pPingpong0, Mat* pPingpong1, bool forward) {
     #pragma omp parallel for
-    for (int v = 0; v < M; v+=n){
+    for (int v = 0; v < M; v+=n) {
 
-        double exp = 2 * M_PI / n * (forward ? -1 : 1);
-        complex<double> w(1), wn(cos(exp), sin(exp));
+        float expo = 2.0f * M_PI / n * (forward ? -1.0f : 1.0f);
+        float cosExpo = cosf(expo);
+        float sinExpo = sinf(expo);
 
-        #pragma omp parallel for
+        float w[2];
+        w[0] = 1.0f;
+        w[1] = 0.0f;
+
+
         for (int i = 0; i < n/2; i++) {
             int evenIdx = v+  2*i;
             int oddIdx =  v+  2*i + 1;
             if (n==2) {
-                evenIdx = reverseBits(evenIdx, BitsConst);
-                oddIdx = reverseBits(oddIdx, BitsConst);
+                evenIdx = reverseBits(evenIdx, NumBits);
+                oddIdx = reverseBits(oddIdx, NumBits);
             }
 
 
-            double* pixelP0Even = pPingpong0->ptr<double>(evenIdx, col);
-            double* pixelP0Odd = pPingpong0->ptr<double>(oddIdx, col);
-            complex<double> even(pixelP0Even[2], pixelP0Even[1]);
-            complex<double> odd(pixelP0Odd[2], pixelP0Odd[1]);
+            float* pixelP0Odd = pPingpong0->ptr<float>(oddIdx, col);
+            float* pixelP0Even = pPingpong0->ptr<float>(evenIdx, col);
 
-            complex<double> butterfly_1 = even + w * odd;
-            complex<double> butterfly_2 = even - w * odd;
+            // w*odd + even;
+            float butterfly_1[2];
+            complex_mul(w[0], w[1], pixelP0Odd[2], pixelP0Odd[1], butterfly_1);
+            complex_add(butterfly_1[0], butterfly_1[1], pixelP0Even[2], pixelP0Even[1], butterfly_1);
+
+            // -w*odd + even;
+            float butterfly_2[2];
+            complex_mul(-w[0], -w[1], pixelP0Odd[2], pixelP0Odd[1], butterfly_2);
+            complex_add(butterfly_2[0], butterfly_2[1], pixelP0Even[2], pixelP0Even[1], butterfly_2);
 
             
-            double* pixelP1First = pPingpong1->ptr<double>(v+  i, col);
-            double* pixelP1Second = pPingpong1->ptr<double>(v+  i + n/2, col);
-            pixelP1First[2] = butterfly_1.real();   pixelP1First[1] = butterfly_1.imag();
-            pixelP1Second[2] = butterfly_2.real();  pixelP1Second[1] = butterfly_2.imag();
-            w *= wn;
+            float* pixelP1First = pPingpong1->ptr<float>(v+  i, col);
+            float* pixelP1Second = pPingpong1->ptr<float>(v+  i + n/2, col);
+            pixelP1First[2] = butterfly_1[0];   pixelP1First[1] = butterfly_1[1];
+            pixelP1Second[2] = butterfly_2[0];  pixelP1Second[1] = butterfly_2[1];
+
+
+            // w *= wn;
+            complex_mul(w[0], w[1], cosExpo, sinExpo, w);
         }
     }
 
     // even-odd merge step
-    if (n < M){
+    if (n < M) {
         #pragma omp parallel for collapse(2)
-        for (int v = 0; v < M; v+=2*n){
-            for(int i = 0; i < 2*n; i+=2){
-                memcpy(pPingpong0->ptr<double>(v + i, col),   pPingpong1->ptr<double>(v + i/2, col),     4*sizeof(double));
-                memcpy(pPingpong0->ptr<double>(v + i+1, col), pPingpong1->ptr<double>(v + i/2 + n, col), 4*sizeof(double));
+        for (int v = 0; v < M; v+=2*n) {
+            for (int i = 0; i < 2*n; i+=2) {
+                memcpy(pPingpong0->ptr<float>(v + i, col),   pPingpong1->ptr<float>(v + i/2, col),     4*sizeof(float));
+                memcpy(pPingpong0->ptr<float>(v + i+1, col), pPingpong1->ptr<float>(v + i/2 + n, col), 4*sizeof(float));
             }
         }
     }
 }
 
 
-// 2D fourier transform broken down as a series of 1D FTs on the rows followed by 1D FTs on the resultant columns
+// 2D fourier transform broken down to a series of 1D FTs on the rows followed by 1D FTs on the resultant columns
 void ft2D(Mat* pSignal, Mat* pX, bool forward, bool spectrum) {
-    // Row DFTS
+    // Row FTs
     #pragma omp parallel for
     for (int y = 0; y < M; y++) {
         ft1D(pSignal, &Pingpong, forward, true, y);
     }
 
-    // Column DFTS
+    // Column FTs
     #pragma omp parallel for
     for (int x = 0; x < M; x++) {
         ft1D(&Pingpong, pX, forward, false, x);
     }
 
 
-    // Normalization
+    // normalise
     normalise(pX, forward, spectrum);
 }
 
+// 1D fourier transform on a single row/column
 void ft1D(Mat* pSignal, Mat* pX, bool forward, bool horizontal, int row_col) {
-    double factor = forward ? -1 : 1;
+    float factor = forward ? -1.0f : 1.0f;
 
     if (horizontal) {
         #pragma omp parallel for
         for (int k = 0; k < M; k++) {
-
-            double sum_real = 0;
-            double sum_imag = 0;
+            float sum_real = 0;
+            float sum_imag = 0;
 
             //#pragma omp parallel for reduction(+:sum_real) reduction(+:sum_imag)   //BROKEN
             for (int n = 0; n < M; n++) {
-                double real =          cos(((2 * M_PI) / M) * k * n);
-                double imag = factor * sin(((2 * M_PI) / M) * k * n);
+                float expo = ((2.0f * M_PI) / M) * k * n;
+                float real =          cosf(expo);
+                float imag = factor * sinf(expo);
 
-                double* pixel = pSignal->ptr<double>(row_col, n);
-                complex<double> val = complex<double>(pixel[2], pixel[1]) * complex<double>(real, imag);
-                sum_real += val.real();
-                sum_imag += val.imag();
+                float* pixel = pSignal->ptr<float>(row_col, n);
+
+                float val[2];
+                complex_mul(pixel[2], pixel[1], real, imag, val);
+                sum_real += val[0];
+                sum_imag += val[1];
             }
 
-            double* pixel = pX->ptr<double>(row_col, k);
+            float* pixel = pX->ptr<float>(row_col, k);
             pixel[2] = sum_real;
             pixel[1] = sum_imag;
         }
@@ -645,22 +717,24 @@ void ft1D(Mat* pSignal, Mat* pX, bool forward, bool horizontal, int row_col) {
     else {
         #pragma omp parallel for
         for (int k = 0; k < M; k++) {
-
-            double sum_real = 0;
-            double sum_imag = 0;
+            float sum_real = 0;
+            float sum_imag = 0;
 
             //#pragma omp parallel for reduction(+:sum_real) reduction(+:sum_imag)  //BROKEN
             for (int n = 0; n < M; n++) {
-                double real =          cos(((2 * M_PI) / M) * k * n);
-                double imag = factor * sin(((2 * M_PI) / M) * k * n);
+                float expo = ((2.0f * M_PI) / M) * k * n;
+                float real =          cosf(expo);
+                float imag = factor * sinf(expo);
 
-                double* pixel = pSignal->ptr<double>(n, row_col);
-                complex<double> val = complex<double>(pixel[2], pixel[1]) * complex<double>(real, imag);
-                sum_real += val.real();
-                sum_imag += val.imag();
+                float* pixel = pSignal->ptr<float>(n, row_col);
+
+                float val[2];
+                complex_mul(pixel[2], pixel[1], real, imag, val);
+                sum_real += val[0];
+                sum_imag += val[1];
             }
 
-            double* pixel = pX->ptr<double>(k, row_col);
+            float* pixel = pX->ptr<float>(k, row_col);
             pixel[2] = sum_real;
             pixel[1] = sum_imag;
         }
@@ -670,30 +744,34 @@ void ft1D(Mat* pSignal, Mat* pX, bool forward, bool horizontal, int row_col) {
 
 // default 2D fourier transform implemented directly from textbook definition
 void ft2D_(Mat* pSignal, Mat* pX, bool forward, bool spectrum) {
-    double factor = (forward ? -1.0 : 1.0);
+    float factor = (forward ? -1.0f : 1.0f);
     #pragma omp parallel for collapse(2)
     for (int v = 0; v < M; v++) {
         for (int u = 0; u < M; u++) {
-
-            double sum_real = 0;
-            double sum_imag = 0;
+            float sum_real = 0;
+            float sum_imag = 0;
 
             #pragma omp parallel for collapse(2) reduction(+:sum_real) reduction(+:sum_imag)
             for (int y = 0; y < M; y++) {
                 for (int x = 0; x < M; x++) {
-                    double exp = (2 * M_PI) * (x*u + y*v) / M;
-                    double real = cos(exp);
-                    double imag = factor * sin(exp);
+                    float expo = (2.0f * M_PI) * (x*u + y*v) / M;
+                    float real =          cosf(expo);
+                    float imag = factor * sinf(expo);
 
-                    double* pixel = pSignal->ptr<double>(y, x);
-                    complex<double> val = complex<double>(pixel[2], pixel[1]) * complex<double>(real, imag);
-                    sum_real += val.real();
-                    sum_imag += val.imag();
+                    float* pixel = pSignal->ptr<float>(y, x);
+
+                    float val[2];
+                    complex_mul(pixel[2], pixel[1], real, imag, val);
+                    sum_real += val[0];
+                    sum_imag += val[1];
+
+                    //complex<float> val = complex<float>(pixel[2], pixel[1]) * complex<float>(real, imag);
+                    //sum_real += val.real();
+                    //sum_imag += val.imag();
                 }
             }
 
-            //different channels
-            double* pixel = pX->ptr<double>(v, u);
+            float* pixel = pX->ptr<float>(v, u);
             pixel[2] = sum_real;
             pixel[1] = sum_imag;
         }
@@ -704,32 +782,38 @@ void ft2D_(Mat* pSignal, Mat* pX, bool forward, bool spectrum) {
 
 
 
-// Create Oceanographic Spectrum
+// Oceanographic Spectra
+
 // rotate spectrum across the complex plane to move simulation through time
-void createHk(Mat* pH0k, Mat* pH0minusk, Mat* pHk, double t) {
+void createHk(Mat* pH0k, Mat* pH0minusk, Mat* pHk, float t) {
     #pragma omp parallel for collapse(2)
-    for (int y = 0; y < M; y++){
+    for (int y = 0; y < M; y++) {
         for (int x = 0; x < M; x++) {
+            float K1 = 2.0f * M_PI * (x - M/2) / L;
+            float K2 = 2.0f * M_PI * (y - M/2) / L;
+            float k = sqrtf(K1*K1 + K2*K2);
 
-            double K1 = 2 * M_PI * (x - M/2) / L;
-            double K2 = 2 * M_PI * (y - M/2) / L;
-            double k = sqrt(K1*K1 + K2*K2);
+            float omega = sqrtf(g * k);
+            float expo = omega * t;
+            float cosExpo = cosf(expo);
+            float sinExpo = sinf(expo);
 
-            double omega = sqrt(g * k);
-            double expo = omega * t;
-            complex<double> comp_1(cos(expo), sin(expo));
-            complex<double> comp_2(comp_1.real(), -comp_1.imag());
+            float* pixelH0k = pH0k->ptr<float>(y, x);
+            float* pixelH0minusk = pH0minusk->ptr<float>(y, x);
 
-            double* pixelH0k = pH0k->ptr<double>(y, x);
-            complex<double> h0k_val(pixelH0k[2], pixelH0k[1]);
 
-            double* pixelH0minusk = pH0minusk->ptr<double>(y, x);
-            complex<double> h0minusk_val(pixelH0minusk[2], pixelH0minusk[1]);
+            // h0k_val * <cosExpo, sinExpo>  +  h0minusk_val * <cosExpo, -sinExpo>;
+            float a[2];
+            float b[2];
+            float hk_val[2];
+            complex_mul(pixelH0k[2], pixelH0k[1], cosExpo,  sinExpo, a);
+            complex_mul(pixelH0minusk[2], pixelH0minusk[1], cosExpo, -sinExpo, b);
+            complex_add(a[0], a[1], b[0], b[1], hk_val);
 
-            complex<double> hk_val = h0k_val * comp_1  +  h0minusk_val * comp_2;
-            double* pixelHk = pHk->ptr<double>(y, x);
-            pixelHk[2] = hk_val.real();
-            pixelHk[1] = hk_val.imag();
+
+            float* pixelHk = pHk->ptr<float>(y, x);
+            pixelHk[2] = hk_val[0];
+            pixelHk[1] = hk_val[1];
             pixelHk[0] = 0;
             pixelHk[3] = 1;
         }
@@ -738,28 +822,27 @@ void createHk(Mat* pH0k, Mat* pH0minusk, Mat* pHk, double t) {
 
 // create initial spectrum
 void createH0(Mat* pNoise, Mat* pH0k, Mat* pH0minusk) {
-    const double bound = 4000;
+    const float bound = 4000;
 
     #pragma omp parallel for collapse(2)
-    for (int y = 0; y < M; y++){
+    for (int y = 0; y < M; y++) {
         for (int x = 0; x < M; x++) {
-
-            double K1 = 2 * M_PI * (x - M/2) / L;
-            double K2 = 2 * M_PI * (y - M/2) / L;
-            double k = sqrt(K1*K1 + K2*K2);
+            float K1 = 2.0f * M_PI * (x - M/2) / L;
+            float K2 = 2.0f * M_PI * (y - M/2) / L;
+            float k = sqrtf(K1*K1 + K2*K2);
             
-            double suppressionFactor = exp(-k*k*l*l);
+            float suppressionFactor = expf(-k*k*l*l);
             
 
-            double* pixelNoise = pNoise->ptr<double>(y, x);
+            float* pixelNoise = pNoise->ptr<float>(y, x);
 
-            double h0k_val = max(-bound, min(bound, sqrt((suppressionFactor * phillips(K1, K2, k)) * 0.5)));
-            double* pixelH0k = pH0k->ptr<double>(y, x);
+            float h0k_val = max(-bound, min(bound, sqrtf((suppressionFactor * phillips(K1, K2, k)) * 0.5f)));
+            float* pixelH0k = pH0k->ptr<float>(y, x);
             pixelH0k[2] = pixelNoise[2] * h0k_val;
             pixelH0k[1] = pixelNoise[1] * h0k_val;
 
-            double h0minusk_val = max(-bound, min(bound, sqrt((suppressionFactor * phillips(-K1, -K2, k)) * 0.5)));
-            double* pixelH0minusk = pH0minusk->ptr<double>(y, x);
+            float h0minusk_val = max(-bound, min(bound, sqrtf((suppressionFactor * phillips(-K1, -K2, k)) * 0.5f)));
+            float* pixelH0minusk = pH0minusk->ptr<float>(y, x);
             pixelH0minusk[2] = pixelNoise[0] * h0minusk_val;
             pixelH0minusk[1] = pixelNoise[3] * h0minusk_val;
         }
@@ -767,26 +850,26 @@ void createH0(Mat* pNoise, Mat* pH0k, Mat* pH0minusk) {
 }
 
 // Phillips Spectrum equation
-double phillips(double K1, double K2, double k) {
-    double K1_N = K1/k;
-    double K2_N = K2/k;
-    double W1_N = W1/w;
-    double W2_N = W2/w;
+float phillips(float K1, float K2, float k) {
+    float K1_N = K1/k;
+    float K2_N = K2/k;
+    float W1_N = W1/w;
+    float W2_N = W2/w;
 
-    return A * (exp(-pow(k*L_, -2)) * pow(k, -4)) * pow(K1_N*W1_N + K2_N*W2_N, 2);
+    return A * (expf(-powf(k*L_, -2)) * powf(k, -4)) * powf(abs(K1_N*W1_N + K2_N*W2_N), directionExp);
 }
 
 // generate a texture of pseudorandom noise
 void createNoiseTexture(Mat* pNoise) {
-    double lower_bound = -1;
-    double upper_bound = 1;
-    uniform_real_distribution<double> unif(lower_bound, upper_bound);
+    float lower_bound = -1;
+    float upper_bound = 1;
+    uniform_real_distribution<float> unif(lower_bound, upper_bound);
     default_random_engine re;
 
 
-    for (int y = 0; y < M; y++){
+    for (int y = 0; y < M; y++) {
         for (int x = 0; x < M; x++) {
-            double* pixel = pNoise->ptr<double>(y, x);
+            float* pixel = pNoise->ptr<float>(y, x);
 
             pixel[2] = unif(re);
             pixel[1] = unif(re);
@@ -799,13 +882,11 @@ void createNoiseTexture(Mat* pNoise) {
 
 
 // Load image from disk
-Mat loadImage(string image_path) {
-    Mat img = imread(image_path, IMREAD_GRAYSCALE);
-    img.convertTo(img, CV_64FC1);
-    img /= 255;
-    resize(img, img, { M, M }, 0, 0, cv::INTER_NEAREST);
-
-    return img;
+void loadImage(Mat* pImg, string image_path) {
+    *pImg = imread(image_path, IMREAD_GRAYSCALE);
+    pImg->convertTo(*pImg, CV_32FC1);
+    *pImg /= 255;
+    resize(*pImg, *pImg, { M, M }, 0, 0, cv::INTER_NEAREST);
 }
 
 
@@ -815,8 +896,8 @@ Mat loadImage(string image_path) {
 void im1CTo4C(Mat* pImage1C, Mat* pImage4C) {
     for (int y = 0; y < M; y++) {
         for (int x = 0; x < M; x++) {
-            double* pixel1C = pImage1C->ptr<double>(y, x);
-            double* pixel4C = pImage4C->ptr<double>(y, x);
+            float* pixel1C = pImage1C->ptr<float>(y, x);
+            float* pixel4C = pImage4C->ptr<float>(y, x);
             pixel4C[2] = *pixel1C;
             pixel4C[1] = *pixel1C;
             pixel4C[0] = *pixel1C;
@@ -828,8 +909,8 @@ void im1CTo4C(Mat* pImage1C, Mat* pImage4C) {
 void im4CTo1C(Mat* pImage4C, Mat* pImage1C) {
     for (int y = 0; y < M; y++) {
         for (int x = 0; x < M; x++) {
-            double* pixel4C = pImage4C->ptr<double>(y, x);
-            double* pixel1C = pImage1C->ptr<double>(y, x);
+            float* pixel4C = pImage4C->ptr<float>(y, x);
+            float* pixel1C = pImage1C->ptr<float>(y, x);
             *pixel1C = pixel4C[2];
         }
     }
@@ -848,14 +929,14 @@ void imshow4CTo1C(string name, Mat* pImage4C, Mat* pImage1C){
 }
 
 void imshow1CTo4CNew(string name, Mat* pImage1C) {
-    Mat image_4C(M, M, CV_64FC4);
+    Mat image_4C(M, M, CV_32FC4);
     im1CTo4C(pImage1C, &image_4C);
 
     imshow(name, image_4C);
 }
 
 void imshow4CTo1CNew(string name, Mat* pImage4C){
-    Mat image_1C(M, M, CV_64FC1);
+    Mat image_1C(M, M, CV_32FC1);
     im4CTo1C(pImage4C, &image_1C);
 
     imshow(name, image_1C);
