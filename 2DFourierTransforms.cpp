@@ -100,6 +100,8 @@ const float L_ = V*V/g;
 const float W1 = 1.0f;
 const float W2 = 1.0f;
 const float w = sqrtf(W1*W1 + W2*W2); //used to normalize wind vector if (W1, W2) is not a unit-vector
+const float W1_N = (w < 0.0001f) ? 0.0f : W1/w;
+const float W2_N = (w < 0.0001f) ? 0.0f : W2/w;
 
 const float A = 4.0f; //wave amplitude
 const float l = 0.5f; //small wave suppression coefficient
@@ -824,7 +826,7 @@ void createHk(Mat* pH0k, Mat* pH0minusk, Mat* pHk, float t) {
 
 // create initial spectrum
 void createH0(Mat* pNoise, Mat* pH0k, Mat* pH0minusk) {
-    const float bound = 4000;
+    const float bound = 4000.0f;
 
     #pragma omp parallel for collapse(2)
     for (int y = 0; y < M; y++) {
@@ -832,6 +834,9 @@ void createH0(Mat* pNoise, Mat* pH0k, Mat* pH0minusk) {
             float K1 = 2.0f * M_PI * (x - M/2) / L;
             float K2 = 2.0f * M_PI * (y - M/2) / L;
             float k = sqrtf(K1*K1 + K2*K2);
+            if (k < 0.0001f) {
+                k = 0.0001f;
+            }
             
             float suppressionFactor = expf(-k*k*l*l);
             
@@ -855,8 +860,6 @@ void createH0(Mat* pNoise, Mat* pH0k, Mat* pH0minusk) {
 float phillips(float K1, float K2, float k) {
     float K1_N = K1/k;
     float K2_N = K2/k;
-    float W1_N = W1/w;
-    float W2_N = W2/w;
 
     return A * (expf(-powf(k*L_, -2)) * powf(k, -4)) * powf(abs(K1_N*W1_N + K2_N*W2_N), directionExp);
 }
