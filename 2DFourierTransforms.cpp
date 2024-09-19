@@ -105,7 +105,7 @@ const float W2_N = (w < 0.0001f) ? 0.0f : W2/w;
 
 const float A = 4.0f; //wave amplitude
 const float l = 0.5f; //small wave suppression coefficient
-const float directionExp = 2.0f; //exponent for supressing waves perpendicular to wind
+const float directionExp = 2.0f; //exponent for suppressing waves perpendicular to wind
 
 
 // Simulation Speed
