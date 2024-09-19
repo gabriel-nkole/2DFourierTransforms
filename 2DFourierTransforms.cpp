@@ -208,7 +208,7 @@ int main(){
         current = Clock::now();                                                                        //to seconds
         elapsedSimulationTime = (chrono::duration_cast<chrono::nanoseconds>(current - start).count() * 0.000000001f) * SimulationSpeed;
 
-        // calculate frame-time                                                                //to milliseconds
+        // calculate frametime                                                                 //to milliseconds
         frameTime = chrono::duration_cast<chrono::nanoseconds>(current - frameStart).count() * 0.000001f;
         frameStart = current;
         cout << frameTime << "ms" << endl;
