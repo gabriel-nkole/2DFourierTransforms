@@ -572,19 +572,20 @@ void horizontalButterfly_(int n, int row, Mat* pPingpong0, Mat* pPingpong1, bool
                 oddIdx = reverseBits(oddIdx, NumBits);
             }
 
-
             float* pixelP0Odd = pPingpong0->ptr<float>(row, oddIdx);
             float* pixelP0Even = pPingpong0->ptr<float>(row, evenIdx);
 
+
+            float w_odd[2];
+            complex_mul(w[0], w[1], pixelP0Odd[2], pixelP0Odd[1], w_odd);
+
             // w*odd + even;
             float butterfly_1[2];
-            complex_mul(w[0], w[1], pixelP0Odd[2], pixelP0Odd[1], butterfly_1);
-            complex_add(butterfly_1[0], butterfly_1[1], pixelP0Even[2], pixelP0Even[1], butterfly_1);
+            complex_add(w_odd[0], w_odd[1], pixelP0Even[2], pixelP0Even[1], butterfly_1);
 
             // -w*odd + even;
             float butterfly_2[2];
-            complex_mul(-w[0], -w[1], pixelP0Odd[2], pixelP0Odd[1], butterfly_2);
-            complex_add(butterfly_2[0], butterfly_2[1], pixelP0Even[2], pixelP0Even[1], butterfly_2);
+            complex_add(-w_odd[0], -w_odd[1], pixelP0Even[2], pixelP0Even[1], butterfly_2);
 
 
             float* pixelP1First =  pPingpong1->ptr<float>(row, v+  i);
@@ -631,19 +632,20 @@ void verticalButterfly_(int n, int col, Mat* pPingpong0, Mat* pPingpong1, bool f
                 oddIdx = reverseBits(oddIdx, NumBits);
             }
 
-
             float* pixelP0Odd = pPingpong0->ptr<float>(oddIdx, col);
             float* pixelP0Even = pPingpong0->ptr<float>(evenIdx, col);
 
+
+            float w_odd[2];
+            complex_mul(w[0], w[1], pixelP0Odd[2], pixelP0Odd[1], w_odd);
+
             // w*odd + even;
             float butterfly_1[2];
-            complex_mul(w[0], w[1], pixelP0Odd[2], pixelP0Odd[1], butterfly_1);
-            complex_add(butterfly_1[0], butterfly_1[1], pixelP0Even[2], pixelP0Even[1], butterfly_1);
+            complex_add(w_odd[0], w_odd[1], pixelP0Even[2], pixelP0Even[1], butterfly_1);
 
             // -w*odd + even;
             float butterfly_2[2];
-            complex_mul(-w[0], -w[1], pixelP0Odd[2], pixelP0Odd[1], butterfly_2);
-            complex_add(butterfly_2[0], butterfly_2[1], pixelP0Even[2], pixelP0Even[1], butterfly_2);
+            complex_add(-w_odd[0], -w_odd[1], pixelP0Even[2], pixelP0Even[1], butterfly_2);
 
             
             float* pixelP1First = pPingpong1->ptr<float>(v+  i, col);
